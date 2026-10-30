@@ -1,0 +1,21 @@
+{
+  "id": "echo",
+  "name": "Echo",
+  "description": "Return the supplied JSON data unchanged.",
+  "version": "0.0.1",
+  "python": "3.12",
+  "entrypoint": "action.py",
+  "settings_schema": {
+    "type": "object",
+    "additionalProperties": false
+  },
+  "input_schema": {},
+  "output_schema": {},
+  "example": {
+    "request_id": "test-001",
+    "data": {
+      "message": "Hello",
+      "value": 42
+    }
+  }
+}
