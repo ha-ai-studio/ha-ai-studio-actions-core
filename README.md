@@ -1,59 +1,108 @@
 # HA AI Studio Actions Core
 
-Core Git action types for HA AI Studio. This repository contains Echo, a technical
-transport test that returns the supplied JSON data unchanged. It contains no
-MQTT client, application credentials or workflow orchestration.
+**A simple starting point for testing and building HA AI Studio plugins.**
 
-## Install in HA AI Studio
+This plugin provides **Echo**, an Action that returns the JSON data you send to it. Use it to check the connection between Home Assistant and [HA AI Studio](https://github.com/ha-ai-studio/ha-ai-studio), test request/result handling, or explore a minimal Action implementation before building your own.
 
-1. Publish this repository to a public HTTPS Git remote.
-2. Open **Settings → Action repositories → Add repository** in HA AI Studio.
-3. Enter the actual HTTPS clone URL and a branch, tag or commit, then wait for Ready.
-4. Choose **Create action → Echo**. Each instance installs into its own Python venv.
-5. Wait for the environment to become Ready, configure Input and Output, then activate.
+Echo runs locally in Studio without external services or additional Python dependencies. It performs no AI inference; it helps you verify the communication path before configuring more specialized Actions.
 
-No local repository source is required or supported by the app. The app's Git
-runner requires Python 3.12. Echo uses only the standard library and installs no
-third-party packages. Repository refresh never executes action code. Installation
-imports the entrypoint to verify the contract; execution happens in a separate
-process. Install only code you trust: a venv is not a security sandbox.
+## Before you start
 
-Existing app-bundled Echo instances keep their original IDs, configuration, jobs
-and runtime as compatibility instances. They are not automatically migrated to
-this repository. New instances use the Git catalog and a fixed commit. Git action
-draft preview is currently unavailable; use isolated brokers and synthetic data
-for integration tests.
+- A current **[HA AI Studio](https://github.com/ha-ai-studio/ha-ai-studio)** installation.
+- An **MQTT v5 broker** configured in Studio and connected to Home Assistant's MQTT integration.
 
-## Repository layout
+## 1. Install the plugin
+
+1. Open **Settings → Action repositories → Add repository** in Studio.
+2. Select **Git** and enter this repository URL:
+
+   ```text
+   https://github.com/ha-ai-studio/ha-ai-studio-actions-core
+   ```
+
+3. Use `main` as the ref, or select a specific tag or commit.
+4. Wait for the repository to become **Ready**.
+5. Open **Actions → Create action**, give the Action a name and select **Echo**.
+6. Open its configuration and wait for its environment to become **Ready**.
+
+## 2. Configure Echo
+
+Echo needs no type-specific settings. Configure its MQTT routes:
+
+| Setting | Example |
+| --- | --- |
+| **Input broker** | The broker used by Home Assistant |
+| **Request topic** | `ha-ai-studio/example/echo/request` |
+| **Output broker** | **Same as input** |
+| **Result topic** | `ha-ai-studio/example/echo/result` |
+
+Use different request and result topics. Under **General**, select **Active** and **Save**.
+
+## 3. Test from Home Assistant
+
+Open **Test in Home Assistant** on the Action and copy the generated YAML into a new Home Assistant automation. Save and enable it, then choose **Run actions**. Check the resulting notification and Studio's **Live activity** view.
+
+To send a request yourself, publish JSON to the request topic with **QoS 1** and **retain disabled**:
+
+```json
+{
+  "request_id": "test-001",
+  "data": {
+    "message": "Hello",
+    "value": 42
+  }
+}
+```
+
+The result arrives on the configured result topic:
+
+```json
+{
+  "request_id": "test-001",
+  "status": "success",
+  "data": {
+    "message": "Hello",
+    "value": 42
+  }
+}
+```
+
+The matching `request_id` connects the result to your request. Use a new ID for each new test. When retrying a missing result, resend the same ID and data while Studio still has the result cached.
+
+Echo accepts any valid JSON value in `data`, including objects, arrays, strings, numbers, booleans and `null`. It preserves the value, not the original JSON formatting.
+
+## Troubleshooting
+
+| Symptom | What to check |
+| --- | --- |
+| Echo is missing from the Action types | Check the repository URL, ref and status in Settings. |
+| No response arrives | Check that the Action is saved and Active, the brokers are connected, and the request/result topics match. Inspect **Live activity**. |
+| Request is ignored | Ensure retain is disabled and the message uses the request envelope shown above. |
+| `request_id_conflict` | The ID was already used with different data. Use a new ID for a new request. |
+
+## Build your own Action
+
+Echo is a minimal example of the [Studio plugin contract](https://github.com/ha-ai-studio/ha-ai-studio/blob/main/ha_ai_studio/app/action_types/README.md):
 
 ```text
 actions/echo/
-  action.json         # Metadata, schemas, version and example request
-  action.py           # async execute(data, settings)
-  requirements.lock   # No external dependencies
+  action.json         # Action metadata, schemas and example request
+  action.py           # execute(data, settings) implementation
+  requirements.lock   # Dependency lockfile; Echo has no external dependencies
 ```
 
-The input and output schemas describe the envelope's `data` value. Echo accepts
-any finite JSON value, including null, booleans, strings, numbers, arrays and
-objects. Settings must be an empty object. The HA AI Studio runtime owns envelope
-validation, MQTT, durable request IDs, deduplication and result delivery.
+Studio handles MQTT, request validation, execution and result delivery. Your Action implements the processing logic and declares its input, output and settings schemas. Echo uses Python 3.12 and runs in a per-instance environment managed by Studio.
 
-Example request:
+For local plugin development and source reloading, see [Studio's development guide](https://github.com/ha-ai-studio/ha-ai-studio/blob/main/docs/DEVELOPMENT.md).
 
-```json
-{"request_id": "test-001", "data": {"message": "Hello", "value": 42}}
+Run the plugin tests from the repository root:
+
+```sh
+python3 -m unittest discover -s tests -v
 ```
 
-Successful result:
+These tests use synthetic data and do not connect to MQTT or external services.
 
-```json
-{"request_id": "test-001", "status": "success", "data": {"message": "Hello", "value": 42}}
-```
+## License
 
-## Tests
-
-Run `python3 -m unittest discover -s tests -v`. Tests use synthetic data and do not
-connect to MQTT or any external service. This repository has no dependency on the
-HA AI Studio source tree.
-
-Licensed under MIT; see LICENSE.
+MIT — see [LICENSE](LICENSE).
